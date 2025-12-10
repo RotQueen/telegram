@@ -177,6 +177,7 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE, repo
         return
 
     caption = build_media_caption(role, message.caption)
+    caption = caption_for_role(role)
     text_prefix = prefix_for_role(role)
 
     try:
