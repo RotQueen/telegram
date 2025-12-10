@@ -149,13 +149,6 @@ def caption_for_role(role: str) -> str:
     return "🧑‍🎨 Сообщение от команды." if role == "executor" else "👤 Сообщение от клиента."
 
 
-def build_media_caption(role: str, original_caption: Optional[str]) -> str:
-    base = caption_for_role(role)
-    if original_caption:
-        return f"{base}\n{original_caption}"
-    return base
-
-
 def prefix_for_role(role: str) -> str:
     return "🧑‍🎨 Сообщение от команды: " if role == "executor" else "👤 Сообщение от клиента: "
 
@@ -176,25 +169,44 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE, repo
         await message.reply_text("В проекте не привязан парный чат. Обратитесь к администратору.")
         return
 
-    caption = build_media_caption(role, message.caption)
+    media_caption = caption_for_role(role)
     text_prefix = prefix_for_role(role)
+
+    async def send_media(target_send_callable, file_id: str, include_caption: bool = True):
+        await target_send_callable(
+            target_chat_id,
+            file_id,
+            caption=media_caption if include_caption else None,
+        )
+
+    async def send_original_caption_if_any():
+        if message.caption:
+            await context.bot.send_message(target_chat_id, f"{text_prefix}{message.caption}")
 
     try:
         if message.text:
             await context.bot.send_message(target_chat_id, f"{text_prefix}{message.text}")
         elif message.document:
-            await context.bot.send_document(
-                target_chat_id, message.document.file_id, caption=caption
-            )
+            await send_media(context.bot.send_document, message.document.file_id)
+            await send_original_caption_if_any()
         elif message.photo:
             photo = message.photo[-1]
-            await context.bot.send_photo(target_chat_id, photo.file_id, caption=caption)
+            await send_media(context.bot.send_photo, photo.file_id)
+            await send_original_caption_if_any()
         elif message.voice:
-            await context.bot.send_voice(target_chat_id, message.voice.file_id, caption=caption)
+            await send_media(context.bot.send_voice, message.voice.file_id)
+            await send_original_caption_if_any()
         elif message.audio:
-            await context.bot.send_audio(target_chat_id, message.audio.file_id, caption=caption)
+            await send_media(context.bot.send_audio, message.audio.file_id)
+            await send_original_caption_if_any()
         elif message.video:
-            await context.bot.send_video(target_chat_id, message.video.file_id, caption=caption)
+            await send_media(context.bot.send_video, message.video.file_id)
+            await send_original_caption_if_any()
+        elif message.animation:
+            await send_media(context.bot.send_animation, message.animation.file_id)
+            await send_original_caption_if_any()
+        elif message.video_note:
+            await send_media(context.bot.send_video_note, message.video_note.file_id, include_caption=False)
         else:
             await message.reply_text("Тип сообщения не поддерживается для пересылки.")
     except TelegramError as exc:
