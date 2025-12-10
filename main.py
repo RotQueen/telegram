@@ -150,6 +150,8 @@ def caption_for_role(role: str) -> str:
 
 
 def build_media_caption(role: str, original_caption: Optional[str]) -> str:
+    """Add role marker to the original caption (if any)."""
+
     base = caption_for_role(role)
     if original_caption:
         return f"{base}\n{original_caption}"
@@ -179,22 +181,31 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE, repo
     caption = build_media_caption(role, message.caption)
     text_prefix = prefix_for_role(role)
 
+    async def send_media(target_send_callable, file_id: str, include_caption: bool = True):
+        await target_send_callable(
+            target_chat_id,
+            file_id,
+            caption=caption if include_caption else None,
+        )
+
     try:
         if message.text:
             await context.bot.send_message(target_chat_id, f"{text_prefix}{message.text}")
         elif message.document:
-            await context.bot.send_document(
-                target_chat_id, message.document.file_id, caption=caption
-            )
+            await send_media(context.bot.send_document, message.document.file_id)
         elif message.photo:
             photo = message.photo[-1]
-            await context.bot.send_photo(target_chat_id, photo.file_id, caption=caption)
+            await send_media(context.bot.send_photo, photo.file_id)
         elif message.voice:
-            await context.bot.send_voice(target_chat_id, message.voice.file_id, caption=caption)
+            await send_media(context.bot.send_voice, message.voice.file_id)
         elif message.audio:
-            await context.bot.send_audio(target_chat_id, message.audio.file_id, caption=caption)
+            await send_media(context.bot.send_audio, message.audio.file_id)
         elif message.video:
-            await context.bot.send_video(target_chat_id, message.video.file_id, caption=caption)
+            await send_media(context.bot.send_video, message.video.file_id)
+        elif message.animation:
+            await send_media(context.bot.send_animation, message.animation.file_id)
+        elif message.video_note:
+            await send_media(context.bot.send_video_note, message.video_note.file_id, include_caption=False)
         else:
             await message.reply_text("Тип сообщения не поддерживается для пересылки.")
     except TelegramError as exc:
