@@ -149,6 +149,13 @@ def caption_for_role(role: str) -> str:
     return "🧑‍🎨 Сообщение от команды." if role == "executor" else "👤 Сообщение от клиента."
 
 
+def build_media_caption(role: str, original_caption: Optional[str]) -> str:
+    base = caption_for_role(role)
+    if original_caption:
+        return f"{base}\n{original_caption}"
+    return base
+
+
 def prefix_for_role(role: str) -> str:
     return "🧑‍🎨 Сообщение от команды: " if role == "executor" else "👤 Сообщение от клиента: "
 
@@ -169,6 +176,7 @@ async def relay_message(update: Update, context: ContextTypes.DEFAULT_TYPE, repo
         await message.reply_text("В проекте не привязан парный чат. Обратитесь к администратору.")
         return
 
+    caption = build_media_caption(role, message.caption)
     caption = caption_for_role(role)
     text_prefix = prefix_for_role(role)
 
